@@ -14,6 +14,11 @@ describe("DXT CLI", () => {
   const validManifestPath = join(__dirname, "valid-manifest.json");
   const invalidManifestPath = join(__dirname, "invalid-manifest.json");
 
+  beforeAll(() => {
+    // Ensure the CLI is built
+    execSync("yarn build", { cwd: join(__dirname, "..") });
+  });
+
   it("should validate a valid manifest", () => {
     const result = execSync(`node ${cliPath} validate ${validManifestPath}`, {
       encoding: "utf-8",
