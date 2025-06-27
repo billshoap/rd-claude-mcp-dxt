@@ -15,6 +15,12 @@ DB_PORT = os.environ.get("MSSQL_PORT", "1433")
 DB_NAME = os.environ.get("MSSQL_DATABASE_NAME")
 DB_USERNAME = os.environ.get("MSSQL_USERNAME")
 DB_PASSWORD = os.environ.get("MSSQL_PASSWORD")
+# Add these checks:
+if DB_USERNAME == "${user_config.username}":
+    DB_USERNAME = None  # Or use "" if you prefer an empty string
+if DB_PASSWORD == "${user_config.password}":
+    DB_PASSWORD = None  # Or use "" 
+
 DB_AUTH_METHOD = os.environ.get("MSSQL_AUTHENTICATION_METHOD", "sql_server_authentication")
 DB_ODBC_DRIVER = os.environ.get("MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server")
 DB_TRUST_CERT = os.environ.get("MSSQL_TRUST_SERVER_CERTIFICATE", "false").lower() == "true"

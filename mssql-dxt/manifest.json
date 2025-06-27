@@ -11,7 +11,7 @@
     "type": "python",
     "entry_point": "server/main.py",
     "mcp_config": {
-      "command": "python3",
+      "command": "python",
       "args": [
         "${__dirname}/server/main.py"
       ],
@@ -105,7 +105,11 @@
     "runtimes": {
       "python": ">=3.8"
     },
-    "platforms": ["darwin", "win32", "linux"]
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ]
   },
   "license": "MIT"
 }
