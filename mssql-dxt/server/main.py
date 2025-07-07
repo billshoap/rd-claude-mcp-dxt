@@ -12,20 +12,34 @@ mcp = FastMCP("mssql-dxt-server")
 # This environment variable can be used by the DXT to get its config.
 USER_CONFIG_ENV_VAR = "USER_CONFIG"
 
-def _get_bool_env(var_name: str, default: bool) -> bool:
+def _is_placeholder(value: str | None) -> bool:
+    """Checks if a string value is an unsubstituted placeholder."""
+    if value is None:
+        return False
+    return value.startswith("${user_config.") and value.endswith("}")
+
+def _get_env_val(var_name: str) -> str | None:
+    """Gets environment variable, returning None if it's a placeholder or not set."""
     val = os.environ.get(var_name)
-    if val is None:
+    if _is_placeholder(val):
+        print(f"Info: Environment variable '{var_name}' contains placeholder, treating as not set.", file=sys.stderr)
+        return None
+    return val
+
+def _get_bool_env(var_name: str, default: bool) -> bool:
+    val_str = _get_env_val(var_name)
+    if val_str is None:
         return default
-    return val.lower() == 'true'
+    return val_str.lower() == 'true'
 
 def _get_int_env(var_name: str, default: int) -> int:
-    val = os.environ.get(var_name)
-    if val is None:
+    val_str = _get_env_val(var_name)
+    if val_str is None:
         return default
     try:
-        return int(val)
+        return int(val_str)
     except ValueError:
-        print(f"Warning: Could not parse environment variable {var_name} ('{val}') as int, using default {default}.", file=sys.stderr)
+        print(f"Warning: Could not parse environment variable {var_name} ('{val_str}') as int, using default {default}.", file=sys.stderr)
         return default
 
 def load_connections_from_env():
@@ -34,40 +48,47 @@ def load_connections_from_env():
     for i in range(1, 4):  # For conn1, conn2, conn3
         env_prefix = f"APP_CONN{i}_"
 
-        # conn1_enable defaults to True if env var not set, others False
-        enable_default = True if i == 1 and os.environ.get(f"{env_prefix}ENABLE") is None else False
-        is_enabled = _get_bool_env(f"{env_prefix}ENABLE", enable_default)
+        # Special handling for enable default for conn1
+        enable_env_val = os.environ.get(f"{env_prefix}ENABLE") # Read raw value for default check
+        if i == 1 and enable_env_val is None: # APP_CONN1_ENABLE not set at all
+            is_enabled = True # Default for conn1_enable is true from manifest
+        elif _is_placeholder(enable_env_val) and i == 1: # APP_CONN1_ENABLE is placeholder
+             is_enabled = True # Treat placeholder as "not set by user", apply manifest default
+        else: # For conn2, conn3, or if conn1_enable is explicitly set (even if placeholder for those)
+            is_enabled = _get_bool_env(f"{env_prefix}ENABLE", False) # Default for conn2/3_enable is false
 
         if is_enabled:
-            name = os.environ.get(f"{env_prefix}NAME")
-            server = os.environ.get(f"{env_prefix}SERVER")
-            database = os.environ.get(f"{env_prefix}DATABASE")
+            name = _get_env_val(f"{env_prefix}NAME")
+            server = _get_env_val(f"{env_prefix}SERVER")
+            database = _get_env_val(f"{env_prefix}DATABASE")
 
-            if not all([name, server, database]):
-                print(f"Warning: Connection slot {i} is enabled but missing one or more required fields (Name, Server, Database from env {env_prefix}NAME, {env_prefix}SERVER, {env_prefix}DATABASE). Skipping.", file=sys.stderr)
+            if not all([name, server, database]): # Checks if any are None (due to placeholder or not set) or empty string
+                print(f"Warning: Connection slot {i} is enabled but missing one or more required fields (Name, Server, Database). Check env vars starting with '{env_prefix}'. Skipping.", file=sys.stderr)
                 continue
 
-            port_str = os.environ.get(f"{env_prefix}PORT")
-            port = 1433 # Default from manifest
-            if port_str is not None:
-                try:
-                    port = int(port_str)
-                except ValueError:
-                    print(f"Warning: Invalid port value '{port_str}' for connection {name}. Using default 1433.", file=sys.stderr)
-            else: # Not present in env, use default from manifest
-                print(f"Info: Port not set for connection {name} (Slot {i}), using default 1433.", file=sys.stderr)
+            port = _get_int_env(f"{env_prefix}PORT", 1433) # Default from manifest
 
+            auth_method_val = _get_env_val(f"{env_prefix}AUTH_METHOD")
+            auth_method = auth_method_val if auth_method_val else "sql_server_authentication" # Default from manifest
+
+            username = _get_env_val(f"{env_prefix}USERNAME") # No default, can be None
+            password = _get_env_val(f"{env_prefix}PASSWORD") # No default, can be None
+
+            driver_val = _get_env_val(f"{env_prefix}DRIVER")
+            driver = driver_val if driver_val else "ODBC Driver 17 for SQL Server" # Default from manifest
+
+            trust_cert = _get_bool_env(f"{env_prefix}TRUST_CERT", False) # Default from manifest
 
             connection_details = {
                 "name": name,
                 "server": server,
                 "port": port,
                 "database": database,
-                "auth_method": os.environ.get(f"{env_prefix}AUTH_METHOD", "sql_server_authentication"), # Default from manifest
-                "username": os.environ.get(f"{env_prefix}USERNAME"), # No default, can be None
-                "password": os.environ.get(f"{env_prefix}PASSWORD"), # No default, can be None
-                "driver": os.environ.get(f"{env_prefix}DRIVER", "ODBC Driver 17 for SQL Server"), # Default from manifest
-                "trust_cert": _get_bool_env(f"{env_prefix}TRUST_CERT", False) # Default from manifest
+                "auth_method": auth_method,
+                "username": username,
+                "password": password,
+                "driver": driver,
+                "trust_cert": trust_cert
             }
 
             if connection_details["auth_method"] == "sql_server_authentication" and not connection_details["username"]:
