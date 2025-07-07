@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "mssql-dxt",
   "display_name": "MS SQL Server DXT Extension",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A Desktop Extension to interact with Microsoft SQL Server, supporting up to 3 configured connections.",
   "author": {
     "name": "Jules AI Assistant"
@@ -24,7 +24,7 @@
     "conn1_enable": {
       "type": "boolean",
       "title": "Enable Connection 1",
-      "description": "Enable this connection slot.",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
       "default": true,
       "required": false
     },
@@ -43,6 +43,7 @@
     "conn1_port": {
       "type": "number",
       "title": "Connection 1: Port",
+      "description": "Port number for Connection 1.",
       "default": 1433,
       "required": false
     },
@@ -55,6 +56,7 @@
     "conn1_auth_method": {
       "type": "string",
       "title": "Connection 1: Authentication Method",
+      "description": "Authentication method for Connection 1.",
       "enum": ["sql_server_authentication", "windows_authentication"],
       "default": "sql_server_authentication",
       "required": false
@@ -90,7 +92,7 @@
     "conn2_enable": {
       "type": "boolean",
       "title": "Enable Connection 2",
-      "description": "Enable this connection slot.",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
       "default": false,
       "required": false
     },
@@ -109,6 +111,7 @@
     "conn2_port": {
       "type": "number",
       "title": "Connection 2: Port",
+      "description": "Port number for Connection 2.",
       "default": 1433,
       "required": false
     },
@@ -121,6 +124,7 @@
     "conn2_auth_method": {
       "type": "string",
       "title": "Connection 2: Authentication Method",
+      "description": "Authentication method for Connection 2.",
       "enum": ["sql_server_authentication", "windows_authentication"],
       "default": "sql_server_authentication",
       "required": false
@@ -128,7 +132,7 @@
     "conn2_username": {
       "type": "string",
       "title": "Connection 2: Username",
-      "description": "Username for SQL Server Authentication on Connection 2.",
+      "description": "Username for SQL Server Authentication on Connection 2. (Leave blank for Windows Auth)",
       "required": false
     },
     "conn2_password": {
@@ -156,7 +160,7 @@
     "conn3_enable": {
       "type": "boolean",
       "title": "Enable Connection 3",
-      "description": "Enable this connection slot.",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
       "default": false,
       "required": false
     },
@@ -175,6 +179,7 @@
     "conn3_port": {
       "type": "number",
       "title": "Connection 3: Port",
+      "description": "Port number for Connection 3.",
       "default": 1433,
       "required": false
     },
@@ -187,6 +192,7 @@
     "conn3_auth_method": {
       "type": "string",
       "title": "Connection 3: Authentication Method",
+      "description": "Authentication method for Connection 3.",
       "enum": ["sql_server_authentication", "windows_authentication"],
       "default": "sql_server_authentication",
       "required": false
@@ -194,7 +200,7 @@
     "conn3_username": {
       "type": "string",
       "title": "Connection 3: Username",
-      "description": "Username for SQL Server Authentication on Connection 3.",
+      "description": "Username for SQL Server Authentication on Connection 3. (Leave blank for Windows Auth)",
       "required": false
     },
     "conn3_password": {
