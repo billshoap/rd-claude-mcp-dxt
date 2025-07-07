@@ -2,8 +2,8 @@
   "dxt_version": "0.1",
   "name": "mssql-dxt",
   "display_name": "MS SQL Server DXT Extension",
-  "version": "0.2.0",
-  "description": "A Desktop Extension to interact with Microsoft SQL Server, supporting multiple connections.",
+  "version": "0.2.1",
+  "description": "A Desktop Extension to interact with Microsoft SQL Server, supporting multiple connections via a JSON configuration.",
   "author": {
     "name": "Jules AI Assistant"
   },
@@ -21,90 +21,18 @@
     }
   },
   "user_config": {
-    "connections": {
-      "type": "array",
-      "title": "MSSQL Server Connections",
-      "description": "Define one or more connections to MSSQL Servers.",
-      "items": {
-        "type": "object",
-        "title": "Connection",
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Connection Name",
-            "description": "A unique name for this connection (e.g., 'dev-server', 'prod-analytics').",
-            "required": true
-          },
-          "server": {
-            "type": "string",
-            "title": "Server Address",
-            "description": "Hostname or IP address of the MS SQL Server instance.",
-            "required": true
-          },
-          "port": {
-            "type": "number",
-            "title": "Port",
-            "description": "Port number for the MS SQL Server instance.",
-            "default": 1433,
-            "required": true
-          },
-          "database": {
-            "type": "string",
-            "title": "Database Name",
-            "description": "The default database to connect to.",
-            "required": true
-          },
-          "auth_method": {
-            "type": "string",
-            "title": "Authentication Method",
-            "description": "Choose 'sql_server_authentication' or 'windows_authentication'.",
-            "enum": ["sql_server_authentication", "windows_authentication"],
-            "default": "sql_server_authentication",
-            "required": true
-          },
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "Username for SQL Server Authentication. (Leave blank for Windows Auth)",
-            "required": false
-          },
-          "password": {
-            "type": "string",
-            "title": "Password",
-            "description": "Password for SQL Server Authentication. (Leave blank for Windows Auth)",
-            "sensitive": true,
-            "required": false
-          },
-          "driver": {
-            "type": "string",
-            "title": "ODBC Driver",
-            "description": "The name of the ODBC driver installed on your system for MS SQL Server.",
-            "default": "ODBC Driver 17 for SQL Server",
-            "required": true
-          },
-          "trust_cert": {
-            "type": "boolean",
-            "title": "Trust Server Certificate",
-            "description": "Set to true to trust the server certificate automatically (e.g., for self-signed certificates).",
-            "default": false,
-            "required": false
-          }
-        },
-        "required": [
-          "name",
-          "server",
-          "port",
-          "database",
-          "auth_method",
-          "driver"
-        ]
-      }
+    "connections_json": {
+      "type": "string",
+      "title": "Connections JSON",
+      "description": "Enter a JSON string representing an array of connection objects. Each object must define 'name', 'server', 'port', 'database', 'auth_method', 'driver', and optionally 'username', 'password', 'trust_cert'. Example: [{\"name\":\"dev\",\"server\":\"localhost\",\"port\":1433,\"database\":\"mydb\",\"auth_method\":\"sql_server_authentication\",\"username\":\"sa\",\"password\":\"yourpassword\",\"driver\":\"ODBC Driver 17 for SQL Server\",\"trust_cert\":false}]",
+      "required": false,
+      "default": "[]"
     }
   },
   "tools": [
     {
       "name": "list_configured_connections",
-      "description": "Lists the names of all configured MSSQL connections."
+      "description": "Lists the names of all configured MSSQL connections from the Connections JSON."
     },
     {
       "name": "execute_query",

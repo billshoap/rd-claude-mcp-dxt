@@ -16,17 +16,31 @@ def get_user_config_data():
     """Retrieves user configuration data."""
     config_str = os.environ.get(USER_CONFIG_ENV_VAR)
     if not config_str:
-        # This case should ideally be handled by the MCP host,
-        # ensuring the env var is always populated.
-        # Fallback for local testing if FastMCP doesn't inject it directly.
-        # In a real Claude Desktop environment, FastMCP might provide a direct method.
-        print("Warning: USER_CONFIG environment variable not found. Using empty connections list.", file=sys.stderr)
-        return {}
+        print("Warning: USER_CONFIG environment variable not found. No user configuration loaded.", file=sys.stderr)
+        return {} # Return empty dict, which means 'connections_json' will be missing
     try:
-        return json.loads(config_str)
+        raw_user_config = json.loads(config_str)
+        connections_list = []
+        connections_json_str = raw_user_config.get("connections_json")
+
+        if connections_json_str:
+            try:
+                parsed_connections = json.loads(connections_json_str)
+                if isinstance(parsed_connections, list):
+                    connections_list = parsed_connections
+                else:
+                    print(f"Error: 'connections_json' in USER_CONFIG is not a JSON array. Found type: {type(parsed_connections)}", file=sys.stderr)
+            except json.JSONDecodeError as e:
+                print(f"Error decoding 'connections_json' string: {e}. Content: '{connections_json_str[:100]}...'", file=sys.stderr)
+        else:
+            print("Info: 'connections_json' not found or empty in USER_CONFIG. No connections will be configured.", file=sys.stderr)
+
+        # Store the parsed list under a 'connections' key for compatibility with rest of the script
+        return {"connections": connections_list}
+
     except json.JSONDecodeError as e:
-        print(f"Error decoding USER_CONFIG JSON: {e}", file=sys.stderr)
-        return {}
+        print(f"Error decoding the main USER_CONFIG JSON: {e}", file=sys.stderr)
+        return {} # Return empty dict
 
 USER_CONFIG_DATA = None
 
