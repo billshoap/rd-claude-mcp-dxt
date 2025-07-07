@@ -15,8 +15,9 @@ USER_CONFIG_ENV_VAR = "USER_CONFIG"
 def get_user_config_data():
     """Retrieves user configuration data."""
     config_str = os.environ.get(USER_CONFIG_ENV_VAR)
+    print(f"DEBUG: Received USER_CONFIG string: '{config_str}'", file=sys.stderr) # Added for diagnostics
     if not config_str or not config_str.strip(): # Check for None, empty, or whitespace-only
-        print("Warning: USER_CONFIG environment variable not found or is empty. No user configuration loaded.", file=sys.stderr)
+        print("Warning: USER_CONFIG environment variable not found or is effectively empty. No user configuration loaded.", file=sys.stderr)
         return {"connections": []}
     try:
         user_config = json.loads(config_str)
