@@ -2,8 +2,8 @@
   "dxt_version": "0.1",
   "name": "mssql-dxt",
   "display_name": "MS SQL Server DXT Extension",
-  "version": "0.1.0",
-  "description": "A Desktop Extension to interact with Microsoft SQL Server.",
+  "version": "0.4.0",
+  "description": "A Desktop Extension to interact with Microsoft SQL Server, supporting up to 3 configured connections.",
   "author": {
     "name": "Jules AI Assistant"
   },
@@ -17,88 +17,264 @@
       ],
       "env": {
         "PYTHONPATH": "${__dirname}/server/lib",
-        "MSSQL_SERVER_ADDRESS": "${user_config.server_address}",
-        "MSSQL_DATABASE_NAME": "${user_config.database_name}",
-        "MSSQL_USERNAME": "${user_config.username}",
-        "MSSQL_PASSWORD": "${user_config.password}",
-        "MSSQL_AUTHENTICATION_METHOD": "${user_config.authentication_method}",
-        "MSSQL_PORT": "${user_config.port}",
-        "MSSQL_ODBC_DRIVER": "${user_config.driver}",
-        "MSSQL_TRUST_SERVER_CERTIFICATE": "${user_config.trust_server_certificate}"
+        "APP_CONN1_ENABLE": "${user_config.conn1_enable}",
+        "APP_CONN1_NAME": "${user_config.conn1_name}",
+        "APP_CONN1_SERVER": "${user_config.conn1_server}",
+        "APP_CONN1_PORT": "${user_config.conn1_port}",
+        "APP_CONN1_DATABASE": "${user_config.conn1_database}",
+        "APP_CONN1_AUTH_METHOD": "${user_config.conn1_auth_method}",
+        "APP_CONN1_USERNAME": "${user_config.conn1_username}",
+        "APP_CONN1_PASSWORD": "${user_config.conn1_password}",
+        "APP_CONN1_DRIVER": "${user_config.conn1_driver}",
+        "APP_CONN1_TRUST_CERT": "${user_config.conn1_trust_cert}",
+        "APP_CONN2_ENABLE": "${user_config.conn2_enable}",
+        "APP_CONN2_NAME": "${user_config.conn2_name}",
+        "APP_CONN2_SERVER": "${user_config.conn2_server}",
+        "APP_CONN2_PORT": "${user_config.conn2_port}",
+        "APP_CONN2_DATABASE": "${user_config.conn2_database}",
+        "APP_CONN2_AUTH_METHOD": "${user_config.conn2_auth_method}",
+        "APP_CONN2_USERNAME": "${user_config.conn2_username}",
+        "APP_CONN2_PASSWORD": "${user_config.conn2_password}",
+        "APP_CONN2_DRIVER": "${user_config.conn2_driver}",
+        "APP_CONN2_TRUST_CERT": "${user_config.conn2_trust_cert}",
+        "APP_CONN3_ENABLE": "${user_config.conn3_enable}",
+        "APP_CONN3_NAME": "${user_config.conn3_name}",
+        "APP_CONN3_SERVER": "${user_config.conn3_server}",
+        "APP_CONN3_PORT": "${user_config.conn3_port}",
+        "APP_CONN3_DATABASE": "${user_config.conn3_database}",
+        "APP_CONN3_AUTH_METHOD": "${user_config.conn3_auth_method}",
+        "APP_CONN3_USERNAME": "${user_config.conn3_username}",
+        "APP_CONN3_PASSWORD": "${user_config.conn3_password}",
+        "APP_CONN3_DRIVER": "${user_config.conn3_driver}",
+        "APP_CONN3_TRUST_CERT": "${user_config.conn3_trust_cert}"
       }
     }
   },
   "user_config": {
-    "server_address": {
-      "type": "string",
-      "title": "Server Address",
-      "description": "Hostname or IP address of the MS SQL Server instance.",
-      "required": true
-    },
-    "port": {
-      "type": "number",
-      "title": "Port",
-      "description": "Port number for the MS SQL Server instance.",
-      "default": 1433,
-      "required": true
-    },
-    "database_name": {
-      "type": "string",
-      "title": "Database Name",
-      "description": "The default database to connect to.",
-      "required": true
-    },
-    "authentication_method": {
-      "type": "string",
-      "title": "Authentication Method",
-      "description": "Choose 'SQL Server Authentication' or 'Windows Authentication'.",
-      "default": "sql_server_authentication",
-      "required": true
-    },
-    "username": {
-      "type": "string",
-      "title": "Username",
-      "description": "Username for SQL Server Authentication. (Leave blank for Windows Auth)",
+    "conn1_enable": {
+      "type": "boolean",
+      "title": "Enable Connection 1",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
+      "default": true,
       "required": false
     },
-    "password": {
+    "conn1_name": {
       "type": "string",
-      "title": "Password",
-      "description": "Password for SQL Server Authentication. (Leave blank for Windows Auth)",
+      "title": "Connection 1: Name",
+      "description": "Unique name for Connection 1 (e.g., 'dev-db'). Required if Connection 1 is enabled.",
+      "required": false
+    },
+    "conn1_server": {
+      "type": "string",
+      "title": "Connection 1: Server Address",
+      "description": "Hostname or IP for Connection 1. Required if Connection 1 is enabled.",
+      "required": false
+    },
+    "conn1_port": {
+      "type": "number",
+      "title": "Connection 1: Port",
+      "description": "Port number for Connection 1.",
+      "default": 1433,
+      "required": false
+    },
+    "conn1_database": {
+      "type": "string",
+      "title": "Connection 1: Database Name",
+      "description": "Default database for Connection 1. Required if Connection 1 is enabled.",
+      "required": false
+    },
+    "conn1_auth_method": {
+      "type": "string",
+      "title": "Connection 1: Authentication Method",
+      "description": "Authentication method for Connection 1.",
+      "enum": ["sql_server_authentication", "windows_authentication"],
+      "default": "sql_server_authentication",
+      "required": false
+    },
+    "conn1_username": {
+      "type": "string",
+      "title": "Connection 1: Username",
+      "description": "Username for SQL Server Authentication on Connection 1. (Leave blank for Windows Auth)",
+      "required": false
+    },
+    "conn1_password": {
+      "type": "string",
+      "title": "Connection 1: Password",
+      "description": "Password for SQL Server Authentication on Connection 1.",
       "sensitive": true,
       "required": false
     },
-    "driver": {
+    "conn1_driver": {
       "type": "string",
-      "title": "ODBC Driver",
-      "description": "The name of the ODBC driver installed on your system for MS SQL Server.",
+      "title": "Connection 1: ODBC Driver",
+      "description": "ODBC driver for Connection 1.",
       "default": "ODBC Driver 17 for SQL Server",
-      "required": true
+      "required": false
     },
-    "trust_server_certificate": {
+    "conn1_trust_cert": {
       "type": "boolean",
-      "title": "Trust Server Certificate",
-      "description": "Set to true to trust the server certificate automatically (e.g., for self-signed certificates).",
+      "title": "Connection 1: Trust Server Certificate",
+      "description": "Trust self-signed certificates for Connection 1.",
+      "default": false,
+      "required": false
+    },
+
+    "conn2_enable": {
+      "type": "boolean",
+      "title": "Enable Connection 2",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
+      "default": false,
+      "required": false
+    },
+    "conn2_name": {
+      "type": "string",
+      "title": "Connection 2: Name",
+      "description": "Unique name for Connection 2. Required if Connection 2 is enabled.",
+      "required": false
+    },
+    "conn2_server": {
+      "type": "string",
+      "title": "Connection 2: Server Address",
+      "description": "Hostname or IP for Connection 2. Required if Connection 2 is enabled.",
+      "required": false
+    },
+    "conn2_port": {
+      "type": "number",
+      "title": "Connection 2: Port",
+      "description": "Port number for Connection 2.",
+      "default": 1433,
+      "required": false
+    },
+    "conn2_database": {
+      "type": "string",
+      "title": "Connection 2: Database Name",
+      "description": "Default database for Connection 2. Required if Connection 2 is enabled.",
+      "required": false
+    },
+    "conn2_auth_method": {
+      "type": "string",
+      "title": "Connection 2: Authentication Method",
+      "description": "Authentication method for Connection 2.",
+      "enum": ["sql_server_authentication", "windows_authentication"],
+      "default": "sql_server_authentication",
+      "required": false
+    },
+    "conn2_username": {
+      "type": "string",
+      "title": "Connection 2: Username",
+      "description": "Username for SQL Server Authentication on Connection 2. (Leave blank for Windows Auth)",
+      "required": false
+    },
+    "conn2_password": {
+      "type": "string",
+      "title": "Connection 2: Password",
+      "description": "Password for SQL Server Authentication on Connection 2.",
+      "sensitive": true,
+      "required": false
+    },
+    "conn2_driver": {
+      "type": "string",
+      "title": "Connection 2: ODBC Driver",
+      "description": "ODBC driver for Connection 2.",
+      "default": "ODBC Driver 17 for SQL Server",
+      "required": false
+    },
+    "conn2_trust_cert": {
+      "type": "boolean",
+      "title": "Connection 2: Trust Server Certificate",
+      "description": "Trust self-signed certificates for Connection 2.",
+      "default": false,
+      "required": false
+    },
+
+    "conn3_enable": {
+      "type": "boolean",
+      "title": "Enable Connection 3",
+      "description": "Enable this connection slot. If enabled, Name, Server Address, and Database Name are required.",
+      "default": false,
+      "required": false
+    },
+    "conn3_name": {
+      "type": "string",
+      "title": "Connection 3: Name",
+      "description": "Unique name for Connection 3. Required if Connection 3 is enabled.",
+      "required": false
+    },
+    "conn3_server": {
+      "type": "string",
+      "title": "Connection 3: Server Address",
+      "description": "Hostname or IP for Connection 3. Required if Connection 3 is enabled.",
+      "required": false
+    },
+    "conn3_port": {
+      "type": "number",
+      "title": "Connection 3: Port",
+      "description": "Port number for Connection 3.",
+      "default": 1433,
+      "required": false
+    },
+    "conn3_database": {
+      "type": "string",
+      "title": "Connection 3: Database Name",
+      "description": "Default database for Connection 3. Required if Connection 3 is enabled.",
+      "required": false
+    },
+    "conn3_auth_method": {
+      "type": "string",
+      "title": "Connection 3: Authentication Method",
+      "description": "Authentication method for Connection 3.",
+      "enum": ["sql_server_authentication", "windows_authentication"],
+      "default": "sql_server_authentication",
+      "required": false
+    },
+    "conn3_username": {
+      "type": "string",
+      "title": "Connection 3: Username",
+      "description": "Username for SQL Server Authentication on Connection 3. (Leave blank for Windows Auth)",
+      "required": false
+    },
+    "conn3_password": {
+      "type": "string",
+      "title": "Connection 3: Password",
+      "description": "Password for SQL Server Authentication on Connection 3.",
+      "sensitive": true,
+      "required": false
+    },
+    "conn3_driver": {
+      "type": "string",
+      "title": "Connection 3: ODBC Driver",
+      "description": "ODBC driver for Connection 3.",
+      "default": "ODBC Driver 17 for SQL Server",
+      "required": false
+    },
+    "conn3_trust_cert": {
+      "type": "boolean",
+      "title": "Connection 3: Trust Server Certificate",
+      "description": "Trust self-signed certificates for Connection 3.",
       "default": false,
       "required": false
     }
   },
   "tools": [
     {
+      "name": "list_configured_connections",
+      "description": "Lists the names of all enabled and configured MSSQL connections."
+    },
+    {
       "name": "execute_query",
-      "description": "Executes a SQL query against the connected database."
+      "description": "Executes a SQL query against a specified MSSQL connection."
     },
     {
       "name": "list_databases",
-      "description": "Lists all databases on the SQL server instance."
+      "description": "Lists all databases on a specified MSSQL server instance."
     },
     {
       "name": "list_tables",
-      "description": "Lists all tables in the current/specified database."
+      "description": "Lists all tables in the current/specified database on a specified MSSQL connection."
     },
     {
       "name": "get_table_schema",
-      "description": "Gets the schema (columns, types) for a specified table."
+      "description": "Gets the schema (columns, types) for a specified table on a specified MSSQL connection."
     }
   ],
   "compatibility": {
