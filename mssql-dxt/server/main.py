@@ -9,64 +9,116 @@ from mcp.server.fastmcp import FastMCP
 # Initialize MCP Server
 mcp = FastMCP("mssql-dxt-server")
 
-# Database connection details from environment variables
-DB_SERVER_ADDRESS = os.environ.get("MSSQL_SERVER_ADDRESS")
-DB_PORT = os.environ.get("MSSQL_PORT", "1433")
-DB_NAME = os.environ.get("MSSQL_DATABASE_NAME")
-DB_USERNAME = os.environ.get("MSSQL_USERNAME")
-DB_PASSWORD = os.environ.get("MSSQL_PASSWORD")
-# Add these checks:
-if DB_USERNAME == "${user_config.username}":
-    DB_USERNAME = None  # Or use "" if you prefer an empty string
-if DB_PASSWORD == "${user_config.password}":
-    DB_PASSWORD = None  # Or use "" 
+# This environment variable can be used by the DXT to get its config.
+USER_CONFIG_ENV_VAR = "USER_CONFIG"
 
-DB_AUTH_METHOD = os.environ.get("MSSQL_AUTHENTICATION_METHOD", "sql_server_authentication")
-DB_ODBC_DRIVER = os.environ.get("MSSQL_ODBC_DRIVER", "ODBC Driver 17 for SQL Server")
-DB_TRUST_CERT = os.environ.get("MSSQL_TRUST_SERVER_CERTIFICATE", "false").lower() == "true"
+def get_user_config_data():
+    """Retrieves user configuration data."""
+    config_str = os.environ.get(USER_CONFIG_ENV_VAR)
+    if not config_str:
+        # This case should ideally be handled by the MCP host,
+        # ensuring the env var is always populated.
+        # Fallback for local testing if FastMCP doesn't inject it directly.
+        # In a real Claude Desktop environment, FastMCP might provide a direct method.
+        print("Warning: USER_CONFIG environment variable not found. Using empty connections list.", file=sys.stderr)
+        return {}
+    try:
+        return json.loads(config_str)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding USER_CONFIG JSON: {e}", file=sys.stderr)
+        return {}
 
-def get_db_connection(database_name_override=None):
-    """Establishes and returns a pyodbc connection to the SQL Server."""
-    if not DB_SERVER_ADDRESS or not DB_NAME:
-        raise ValueError("Server address and database name must be configured.")
+USER_CONFIG_DATA = None
+
+def get_db_connection(
+    server_addr: str,
+    port_num: str, # pyodbc expects port as string in connection string
+    db_name: str,
+    auth_method: str,
+    odbc_driver: str,
+    uname: str = None,
+    pwd: str = None,
+    trust_cert_bool: bool = False
+):
+    """Establishes and returns a pyodbc connection to the SQL Server using provided details."""
+    if not server_addr or not db_name or not odbc_driver:
+        raise ValueError("Server address, database name, and ODBC driver must be provided.")
 
     conn_str_parts = [
-        f"DRIVER={{{DB_ODBC_DRIVER}}}",
-        f"SERVER={DB_SERVER_ADDRESS},{DB_PORT}",
-        f"DATABASE={database_name_override or DB_NAME}",
+        f"DRIVER={{{odbc_driver}}}",
+        f"SERVER={server_addr},{port_num}",
+        f"DATABASE={db_name}",
     ]
 
-    if DB_AUTH_METHOD == "windows_authentication":
+    if auth_method == "windows_authentication":
         conn_str_parts.append("Trusted_Connection=yes")
-    elif DB_AUTH_METHOD == "sql_server_authentication":
-        if not DB_USERNAME or DB_PASSWORD is None:
-            raise ValueError("Username and password are required for SQL Server Authentication.")
-        conn_str_parts.append(f"UID={DB_USERNAME}")
-        conn_str_parts.append(f"PWD={{{DB_PASSWORD}}}")
+    elif auth_method == "sql_server_authentication":
+        if not uname: # Password can be blank for some SQL users
+            raise ValueError("Username is required for SQL Server Authentication.")
+        conn_str_parts.append(f"UID={uname}")
+        # Password can be None or empty string, pyodbc handles it.
+        # Ensure PWD key is added even if password is blank, but with proper quoting for empty.
+        conn_str_parts.append(f"PWD={{{pwd or ''}}}")
     else:
-        raise ValueError(f"Unsupported authentication method: {DB_AUTH_METHOD}")
+        raise ValueError(f"Unsupported authentication method: {auth_method}")
 
-    if DB_TRUST_CERT:
+    if trust_cert_bool:
         conn_str_parts.append("TrustServerCertificate=yes")
 
     connection_string = ";".join(conn_str_parts)
+    # print(f"Attempting connection with: {connection_string.replace(pwd, '********') if pwd else connection_string}", file=sys.stderr) # For debugging
 
     try:
-        conn = pyodbc.connect(connection_string)
+        conn = pyodbc.connect(connection_string, timeout=5) # Added timeout
         return conn
     except pyodbc.Error as ex:
-        # sqlstate = ex.args[0] # Uncomment for debugging if needed
-        raise ConnectionError(f"Failed to connect to SQL Server: {ex}")
+        raise ConnectionError(f"Failed to connect to SQL Server '{server_addr}': {ex}")
+
+
+def _get_connection_details_by_name(connection_name: str):
+    """Helper to find connection details from USER_CONFIG_DATA."""
+    global USER_CONFIG_DATA
+    if USER_CONFIG_DATA is None: # Ensure it's loaded once
+        USER_CONFIG_DATA = get_user_config_data()
+
+    connections = USER_CONFIG_DATA.get("connections", [])
+    for conn_details in connections:
+        if conn_details.get("name") == connection_name:
+            return conn_details
+    raise ValueError(f"Connection name '{connection_name}' not found in configuration.")
 
 @mcp.tool()
-def execute_query(query: str) -> str:
+def list_configured_connections() -> str:
     """
-    Executes a SQL query against the connected database.
+    Lists the names of all configured MSSQL connections.
+    Returns data as a JSON string: { "connections": [{"name": "conn1"}, {"name": "conn2"}, ...] }
+    """
+    global USER_CONFIG_DATA
+    if USER_CONFIG_DATA is None:
+        USER_CONFIG_DATA = get_user_config_data()
+
+    connections = USER_CONFIG_DATA.get("connections", [])
+    return json.dumps({"connections": [{"name": c.get("name")} for c in connections if c.get("name")]})
+
+@mcp.tool()
+def execute_query(connection_name: str, query: str) -> str:
+    """
+    Executes a SQL query against the specified MSSQL connection.
     Returns data as a JSON string: { "columns": ["col1", ...], "rows": [[val1, ...], ...] }
     or an error message.
     """
     try:
-        with get_db_connection() as conn:
+        conn_details = _get_connection_details_by_name(connection_name)
+        with get_db_connection(
+            server_addr=conn_details["server"],
+            port_num=str(conn_details.get("port", 1433)),
+            db_name=conn_details["database"],
+            auth_method=conn_details["auth_method"],
+            odbc_driver=conn_details["driver"],
+            uname=conn_details.get("username"),
+            pwd=conn_details.get("password"),
+            trust_cert_bool=conn_details.get("trust_cert", False)
+        ) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
 
@@ -81,67 +133,85 @@ def execute_query(query: str) -> str:
                          fetched_rows_list = [list(row_item) for row_item in fetched_rows_from_cursor]
                          results["rows"] = fetched_rows_list
                 except pyodbc.ProgrammingError:
-                    # Query did not return rows (e.g., UPDATE, INSERT) or cursor unavailable.
-                    pass
+                    pass # Query did not return rows
 
                 if not results["columns"] and not results["rows"]:
                     if cursor.rowcount != -1:
-                        return json.dumps({"status": "success", "message": f"Query executed successfully. Rows affected: {cursor.rowcount}"})
+                        return json.dumps({"status": "success", "connection_name": connection_name, "message": f"Query executed successfully. Rows affected: {cursor.rowcount}"})
                     else:
-                        return json.dumps({"status": "success", "message": "Query executed successfully. No rows returned and no rowcount available."})
+                        return json.dumps({"status": "success", "connection_name": connection_name, "message": "Query executed successfully. No rows returned and no rowcount available."})
 
-                return json.dumps(results)
+                return json.dumps({"connection_name": connection_name, **results})
 
-    except (pyodbc.Error, ConnectionError) as e:
-        return json.dumps({"status": "error", "message": str(e)})
+    except (pyodbc.Error, ConnectionError, ValueError) as e:
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": str(e)})
     except Exception as e:
-        return json.dumps({"status": "error", "message": f"An unexpected error occurred: {str(e)}"})
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
-def list_databases() -> str:
+def list_databases(connection_name: str) -> str:
     """
-    Lists all databases on the SQL server instance.
+    Lists all databases on the specified SQL server instance.
     Returns data as a JSON string: { "databases": ["db1", "db2", ...] } or an error message.
     """
     query = "SELECT name FROM sys.databases WHERE state = 0 ORDER BY name;"
     try:
-        with get_db_connection() as conn:
+        conn_details = _get_connection_details_by_name(connection_name)
+        with get_db_connection(
+            server_addr=conn_details["server"],
+            port_num=str(conn_details.get("port", 1433)),
+            db_name=conn_details["database"], # Connect to default db to list others
+            auth_method=conn_details["auth_method"],
+            odbc_driver=conn_details["driver"],
+            uname=conn_details.get("username"),
+            pwd=conn_details.get("password"),
+            trust_cert_bool=conn_details.get("trust_cert", False)
+        ) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 databases = [row[0] for row in cursor.fetchall()]
-                return json.dumps({"databases": databases})
-    except (pyodbc.Error, ConnectionError) as e:
-        return json.dumps({"status": "error", "message": str(e)})
+                return json.dumps({"connection_name": connection_name, "databases": databases})
+    except (pyodbc.Error, ConnectionError, ValueError) as e:
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": str(e)})
     except Exception as e:
-        return json.dumps({"status": "error", "message": f"An unexpected error occurred: {str(e)}"})
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
-def list_tables(database_name: str = None) -> str:
+def list_tables(connection_name: str, database_name: str = None) -> str:
     """
-    Lists all tables in the specified database (or the default if not provided).
+    Lists all tables in the specified database (or the connection's default if not provided)
+    on the specified MSSQL connection.
     Returns data as a JSON string: { "tables": ["table1", "table2", ...] } or an error message.
     """
     query = "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
     try:
-        current_db_name = database_name if database_name else DB_NAME
-        with get_db_connection(database_name_override=current_db_name) as conn:
+        conn_details = _get_connection_details_by_name(connection_name)
+        current_db_name = database_name if database_name else conn_details["database"]
+        with get_db_connection(
+            server_addr=conn_details["server"],
+            port_num=str(conn_details.get("port", 1433)),
+            db_name=current_db_name,
+            auth_method=conn_details["auth_method"],
+            odbc_driver=conn_details["driver"],
+            uname=conn_details.get("username"),
+            pwd=conn_details.get("password"),
+            trust_cert_bool=conn_details.get("trust_cert", False)
+        ) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 tables = [f"{row[0]}.{row[1]}" for row in cursor.fetchall()]
-                return json.dumps({"tables": tables})
-    except (pyodbc.Error, ConnectionError) as e:
-        return json.dumps({"status": "error", "message": str(e)})
+                return json.dumps({"connection_name": connection_name, "database_name": current_db_name, "tables": tables})
+    except (pyodbc.Error, ConnectionError, ValueError) as e:
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": str(e)})
     except Exception as e:
-        return json.dumps({"status": "error", "message": f"An unexpected error occurred: {str(e)}"})
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
-def get_table_schema(table_name: str, schema_name: str = 'dbo', database_name: str = None) -> str:
+def get_table_schema(connection_name: str, table_name: str, schema_name: str = 'dbo', database_name: str = None) -> str:
     """
-    Gets the schema (columns, types, nullability) for a specified table.
-    Table name should be just the table name. Schema name defaults to 'dbo'.
-    Returns data as a JSON string:
-    { "schema": [{"column_name": "col1", "data_type": "varchar", "max_length": 255, "is_nullable": "YES"}, ...] }
-    or an error message.
+    Gets the schema for a specified table on a specified MSSQL connection.
+    Schema name defaults to 'dbo'. Database defaults to connection's default.
+    Returns data as a JSON string or an error message.
     """
     query = """
     SELECT
@@ -154,8 +224,18 @@ def get_table_schema(table_name: str, schema_name: str = 'dbo', database_name: s
     ORDER BY ORDINAL_POSITION;
     """
     try:
-        current_db_name = database_name if database_name else DB_NAME
-        with get_db_connection(database_name_override=current_db_name) as conn:
+        conn_details = _get_connection_details_by_name(connection_name)
+        current_db_name = database_name if database_name else conn_details["database"]
+        with get_db_connection(
+            server_addr=conn_details["server"],
+            port_num=str(conn_details.get("port", 1433)),
+            db_name=current_db_name,
+            auth_method=conn_details["auth_method"],
+            odbc_driver=conn_details["driver"],
+            uname=conn_details.get("username"),
+            pwd=conn_details.get("password"),
+            trust_cert_bool=conn_details.get("trust_cert", False)
+        ) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query, table_name, schema_name)
                 columns = []
@@ -168,23 +248,72 @@ def get_table_schema(table_name: str, schema_name: str = 'dbo', database_name: s
                             "is_nullable": row[3]
                         })
                 if not columns:
-                     return json.dumps({"status": "error", "message": f"Table '{schema_name}.{table_name}' not found or has no columns in database '{current_db_name}'."})
-                return json.dumps({"schema": columns})
-    except (pyodbc.Error, ConnectionError) as e:
-        return json.dumps({"status": "error", "message": str(e)})
+                     return json.dumps({"status": "error", "connection_name": connection_name, "database_name": current_db_name, "message": f"Table '{schema_name}.{table_name}' not found or has no columns in database '{current_db_name}'."})
+                return json.dumps({"connection_name": connection_name, "database_name": current_db_name, "schema": columns})
+    except (pyodbc.Error, ConnectionError, ValueError) as e:
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": str(e)})
     except Exception as e:
-        return json.dumps({"status": "error", "message": f"An unexpected error occurred: {str(e)}"})
+        return json.dumps({"status": "error", "connection_name": connection_name, "message": f"An unexpected error occurred: {str(e)}"})
+
+def perform_startup_connection_tests():
+    """
+    Iterates through configured connections and attempts to connect to each one,
+    logging the results to stderr.
+    """
+    global USER_CONFIG_DATA
+    if USER_CONFIG_DATA is None: # Ensure it's loaded once
+        USER_CONFIG_DATA = get_user_config_data()
+
+    connections = USER_CONFIG_DATA.get("connections", [])
+    if not connections:
+        print("No MSSQL connections configured.", file=sys.stderr)
+        return
+
+    print(f"Performing startup connection tests for {len(connections)} configured connection(s)...", file=sys.stderr)
+    for conn_config in connections:
+        conn_name = conn_config.get("name", "Unnamed Connection")
+        print(f"Testing connection: '{conn_name}'...", file=sys.stderr)
+        try:
+            # For SQL Auth, ensure username is present if method is sql_server_authentication
+            if conn_config.get("auth_method") == "sql_server_authentication" and not conn_config.get("username"):
+                raise ValueError("Username is required for SQL Server Authentication.")
+
+            # A simple query to test the connection
+            test_query = "SELECT @@SERVERNAME"
+            with get_db_connection(
+                server_addr=conn_config["server"],
+                port_num=str(conn_config.get("port", 1433)),
+                db_name=conn_config["database"],
+                auth_method=conn_config["auth_method"],
+                odbc_driver=conn_config["driver"],
+                uname=conn_config.get("username"),
+                pwd=conn_config.get("password"),
+                trust_cert_bool=conn_config.get("trust_cert", False)
+            ) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(test_query)
+                    server_name = cursor.fetchone()
+                    if server_name:
+                        print(f"  SUCCESS: Connected to '{conn_name}' (Server: {server_name[0]}).", file=sys.stderr)
+                    else:
+                        print(f"  SUCCESS: Connected to '{conn_name}' (Server name not retrieved).", file=sys.stderr)
+        except (pyodbc.Error, ConnectionError, ValueError) as e:
+            print(f"  FAILED to connect to '{conn_name}': {e}", file=sys.stderr)
+        except Exception as e: # Catch any other unexpected errors during test
+            print(f"  FAILED to connect to '{conn_name}' with an unexpected error: {e}", file=sys.stderr)
+    print("Startup connection tests complete.", file=sys.stderr)
+
 
 if __name__ == "__main__":
-    # Basic check for essential config, though manifest 'required' should handle most cases.
-    if not all([DB_SERVER_ADDRESS, DB_PORT, DB_NAME, DB_AUTH_METHOD, DB_ODBC_DRIVER]):
-         # Consider logging an error or exiting if critical info is missing for direct script run.
-         # For DXT operation, the host ensures user_config values are passed as env vars.
-         pass
+    # Load config first
+    USER_CONFIG_DATA = get_user_config_data()
+
+    # Perform startup connection tests (logging to stderr)
+    # These tests are for informative purposes and won't stop the DXT from running.
+    perform_startup_connection_tests()
 
     try:
         mcp.run()
     except Exception as e:
-        # Consider logging this critical failure.
-        # print(json.dumps({"status": "error", "message": f"Server critical failure: {e}"}), file=sys.stdout) # For direct run debugging
+        print(json.dumps({"status": "critical_error", "message": f"Server critical failure: {e}"}), file=sys.stdout) # Log to stdout for MCP
         sys.exit(1)
