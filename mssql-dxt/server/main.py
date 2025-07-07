@@ -12,65 +12,76 @@ mcp = FastMCP("mssql-dxt-server")
 # This environment variable can be used by the DXT to get its config.
 USER_CONFIG_ENV_VAR = "USER_CONFIG"
 
-def get_user_config_data():
-    """Retrieves user configuration data."""
-    config_str = os.environ.get(USER_CONFIG_ENV_VAR)
-    print(f"DEBUG: Received USER_CONFIG string: '{config_str}'", file=sys.stderr) # Re-added for diagnostics
-    if not config_str or not config_str.strip(): # Check for None, empty, or whitespace-only
-        print("Warning: USER_CONFIG environment variable not found or is effectively empty. No user configuration loaded.", file=sys.stderr)
-        return {"connections": []}
+def _get_bool_env(var_name: str, default: bool) -> bool:
+    val = os.environ.get(var_name)
+    if val is None:
+        return default
+    return val.lower() == 'true'
+
+def _get_int_env(var_name: str, default: int) -> int:
+    val = os.environ.get(var_name)
+    if val is None:
+        return default
     try:
-        user_config = json.loads(config_str)
-        active_connections = []
-        for i in range(1, 4): # For conn1, conn2, conn3
-            conn_prefix = f"conn{i}_"
+        return int(val)
+    except ValueError:
+        print(f"Warning: Could not parse environment variable {var_name} ('{val}') as int, using default {default}.", file=sys.stderr)
+        return default
 
-            # Check if the connection is enabled or if essential fields are present
-            # Default conn1_enable to True if not explicitly set, others to False
-            is_enabled_key = f"{conn_prefix}enable"
-            if i == 1 and is_enabled_key not in user_config : # conn1_enable defaults to true
-                 is_enabled = True
-            else:
-                 is_enabled = user_config.get(is_enabled_key, False)
+def load_connections_from_env():
+    """Loads connection configurations from individual environment variables."""
+    active_connections = []
+    for i in range(1, 4):  # For conn1, conn2, conn3
+        env_prefix = f"APP_CONN{i}_"
 
-            if is_enabled:
-                name = user_config.get(f"{conn_prefix}name")
-                server = user_config.get(f"{conn_prefix}server")
-                database = user_config.get(f"{conn_prefix}database")
+        # conn1_enable defaults to True if env var not set, others False
+        enable_default = True if i == 1 and os.environ.get(f"{env_prefix}ENABLE") is None else False
+        is_enabled = _get_bool_env(f"{env_prefix}ENABLE", enable_default)
 
-                if not all([name, server, database]):
-                    print(f"Warning: Connection {i} is enabled but missing one or more required fields (name, server, database). Skipping.", file=sys.stderr)
-                    continue
+        if is_enabled:
+            name = os.environ.get(f"{env_prefix}NAME")
+            server = os.environ.get(f"{env_prefix}SERVER")
+            database = os.environ.get(f"{env_prefix}DATABASE")
 
-                connection_details = {
-                    "name": name,
-                    "server": server,
-                    "port": user_config.get(f"{conn_prefix}port", 1433),
-                    "database": database,
-                    "auth_method": user_config.get(f"{conn_prefix}auth_method", "sql_server_authentication"),
-                    "username": user_config.get(f"{conn_prefix}username"),
-                    "password": user_config.get(f"{conn_prefix}password"),
-                    "driver": user_config.get(f"{conn_prefix}driver", "ODBC Driver 17 for SQL Server"),
-                    "trust_cert": user_config.get(f"{conn_prefix}trust_cert", False)
-                }
+            if not all([name, server, database]):
+                print(f"Warning: Connection slot {i} is enabled but missing one or more required fields (Name, Server, Database from env {env_prefix}NAME, {env_prefix}SERVER, {env_prefix}DATABASE). Skipping.", file=sys.stderr)
+                continue
 
-                # Validate username for SQL auth
-                if connection_details["auth_method"] == "sql_server_authentication" and not connection_details["username"]:
-                    print(f"Warning: Connection '{name}' (Slot {i}) uses SQL Server Authentication but username is not provided. This might lead to connection issues.", file=sys.stderr)
-                    # We'll still add it, but the connection attempt will likely fail or prompt if interactive (not here)
+            port_str = os.environ.get(f"{env_prefix}PORT")
+            port = 1433 # Default from manifest
+            if port_str is not None:
+                try:
+                    port = int(port_str)
+                except ValueError:
+                    print(f"Warning: Invalid port value '{port_str}' for connection {name}. Using default 1433.", file=sys.stderr)
+            else: # Not present in env, use default from manifest
+                print(f"Info: Port not set for connection {name} (Slot {i}), using default 1433.", file=sys.stderr)
 
-                active_connections.append(connection_details)
 
-        if not active_connections:
-            print("Info: No active connections configured or enabled.", file=sys.stderr)
+            connection_details = {
+                "name": name,
+                "server": server,
+                "port": port,
+                "database": database,
+                "auth_method": os.environ.get(f"{env_prefix}AUTH_METHOD", "sql_server_authentication"), # Default from manifest
+                "username": os.environ.get(f"{env_prefix}USERNAME"), # No default, can be None
+                "password": os.environ.get(f"{env_prefix}PASSWORD"), # No default, can be None
+                "driver": os.environ.get(f"{env_prefix}DRIVER", "ODBC Driver 17 for SQL Server"), # Default from manifest
+                "trust_cert": _get_bool_env(f"{env_prefix}TRUST_CERT", False) # Default from manifest
+            }
 
-        return {"connections": active_connections}
+            if connection_details["auth_method"] == "sql_server_authentication" and not connection_details["username"]:
+                print(f"Warning: Connection '{name}' (Slot {i}) uses SQL Server Authentication but Username is not provided. This might lead to connection issues.", file=sys.stderr)
 
-    except json.JSONDecodeError as e:
-        print(f"Error decoding USER_CONFIG JSON: {e}", file=sys.stderr)
-        return {"connections": []}
+            active_connections.append(connection_details)
 
-USER_CONFIG_DATA = None
+    if not active_connections:
+        print("Info: No active connections configured or enabled from environment variables.", file=sys.stderr)
+
+    return {"connections": active_connections}
+
+
+USER_CONFIG_DATA = None # This will be populated by load_connections_from_env
 
 def get_db_connection(
     server_addr: str,
@@ -121,7 +132,7 @@ def _get_connection_details_by_name(connection_name: str):
     """Helper to find connection details from USER_CONFIG_DATA."""
     global USER_CONFIG_DATA
     if USER_CONFIG_DATA is None: # Ensure it's loaded once
-        USER_CONFIG_DATA = get_user_config_data()
+        USER_CONFIG_DATA = load_connections_from_env() # Changed function call
 
     connections = USER_CONFIG_DATA.get("connections", [])
     for conn_details in connections:
@@ -137,7 +148,7 @@ def list_configured_connections() -> str:
     """
     global USER_CONFIG_DATA
     if USER_CONFIG_DATA is None:
-        USER_CONFIG_DATA = get_user_config_data()
+        USER_CONFIG_DATA = load_connections_from_env() # Changed function call
 
     connections = USER_CONFIG_DATA.get("connections", [])
     return json.dumps({"connections": [{"name": c.get("name")} for c in connections if c.get("name")]})
@@ -304,7 +315,7 @@ def perform_startup_connection_tests():
     """
     global USER_CONFIG_DATA
     if USER_CONFIG_DATA is None: # Ensure it's loaded once
-        USER_CONFIG_DATA = get_user_config_data()
+        USER_CONFIG_DATA = load_connections_from_env() # Changed function call
 
     connections = USER_CONFIG_DATA.get("connections", [])
     if not connections:
@@ -347,9 +358,9 @@ def perform_startup_connection_tests():
 
 
 if __name__ == "__main__":
-    print("DEBUG: Python script main block started.", file=sys.stderr) # New diagnostic line
-    # Load config first
-    USER_CONFIG_DATA = get_user_config_data()
+    print("DEBUG: Python script main block started.", file=sys.stderr)
+    # Load config first by reading individual environment variables
+    USER_CONFIG_DATA = load_connections_from_env()
 
     # Perform startup connection tests (logging to stderr)
     # These tests are for informative purposes and won't stop the DXT from running.

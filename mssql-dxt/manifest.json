@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "mssql-dxt",
   "display_name": "MS SQL Server DXT Extension",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A Desktop Extension to interact with Microsoft SQL Server, supporting up to 3 configured connections.",
   "author": {
     "name": "Jules AI Assistant"
@@ -17,7 +17,36 @@
       ],
       "env": {
         "PYTHONPATH": "${__dirname}/server/lib",
-        "USER_CONFIG": "${user_config}"
+        "APP_CONN1_ENABLE": "${user_config.conn1_enable}",
+        "APP_CONN1_NAME": "${user_config.conn1_name}",
+        "APP_CONN1_SERVER": "${user_config.conn1_server}",
+        "APP_CONN1_PORT": "${user_config.conn1_port}",
+        "APP_CONN1_DATABASE": "${user_config.conn1_database}",
+        "APP_CONN1_AUTH_METHOD": "${user_config.conn1_auth_method}",
+        "APP_CONN1_USERNAME": "${user_config.conn1_username}",
+        "APP_CONN1_PASSWORD": "${user_config.conn1_password}",
+        "APP_CONN1_DRIVER": "${user_config.conn1_driver}",
+        "APP_CONN1_TRUST_CERT": "${user_config.conn1_trust_cert}",
+        "APP_CONN2_ENABLE": "${user_config.conn2_enable}",
+        "APP_CONN2_NAME": "${user_config.conn2_name}",
+        "APP_CONN2_SERVER": "${user_config.conn2_server}",
+        "APP_CONN2_PORT": "${user_config.conn2_port}",
+        "APP_CONN2_DATABASE": "${user_config.conn2_database}",
+        "APP_CONN2_AUTH_METHOD": "${user_config.conn2_auth_method}",
+        "APP_CONN2_USERNAME": "${user_config.conn2_username}",
+        "APP_CONN2_PASSWORD": "${user_config.conn2_password}",
+        "APP_CONN2_DRIVER": "${user_config.conn2_driver}",
+        "APP_CONN2_TRUST_CERT": "${user_config.conn2_trust_cert}",
+        "APP_CONN3_ENABLE": "${user_config.conn3_enable}",
+        "APP_CONN3_NAME": "${user_config.conn3_name}",
+        "APP_CONN3_SERVER": "${user_config.conn3_server}",
+        "APP_CONN3_PORT": "${user_config.conn3_port}",
+        "APP_CONN3_DATABASE": "${user_config.conn3_database}",
+        "APP_CONN3_AUTH_METHOD": "${user_config.conn3_auth_method}",
+        "APP_CONN3_USERNAME": "${user_config.conn3_username}",
+        "APP_CONN3_PASSWORD": "${user_config.conn3_password}",
+        "APP_CONN3_DRIVER": "${user_config.conn3_driver}",
+        "APP_CONN3_TRUST_CERT": "${user_config.conn3_trust_cert}"
       }
     }
   },
