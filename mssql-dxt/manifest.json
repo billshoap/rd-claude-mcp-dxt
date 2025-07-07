@@ -17,88 +17,163 @@
       ],
       "env": {
         "PYTHONPATH": "${__dirname}/server/lib",
-        "MSSQL_SERVER_ADDRESS": "${user_config.server_address}",
-        "MSSQL_DATABASE_NAME": "${user_config.database_name}",
-        "MSSQL_USERNAME": "${user_config.username}",
-        "MSSQL_PASSWORD": "${user_config.password}",
-        "MSSQL_AUTHENTICATION_METHOD": "${user_config.authentication_method}",
-        "MSSQL_PORT": "${user_config.port}",
-        "MSSQL_ODBC_DRIVER": "${user_config.driver}",
-        "MSSQL_TRUST_SERVER_CERTIFICATE": "${user_config.trust_server_certificate}"
+        "MSSQL_SERVER_CONFIGS": "${user_config.servers}"
       }
     }
   },
   "user_config": {
-    "server_address": {
-      "type": "string",
-      "title": "Server Address",
-      "description": "Hostname or IP address of the MS SQL Server instance.",
-      "required": true
-    },
-    "port": {
-      "type": "number",
-      "title": "Port",
-      "description": "Port number for the MS SQL Server instance.",
-      "default": 1433,
-      "required": true
-    },
-    "database_name": {
-      "type": "string",
-      "title": "Database Name",
-      "description": "The default database to connect to.",
-      "required": true
-    },
-    "authentication_method": {
-      "type": "string",
-      "title": "Authentication Method",
-      "description": "Choose 'SQL Server Authentication' or 'Windows Authentication'.",
-      "default": "sql_server_authentication",
-      "required": true
-    },
-    "username": {
-      "type": "string",
-      "title": "Username",
-      "description": "Username for SQL Server Authentication. (Leave blank for Windows Auth)",
-      "required": false
-    },
-    "password": {
-      "type": "string",
-      "title": "Password",
-      "description": "Password for SQL Server Authentication. (Leave blank for Windows Auth)",
-      "sensitive": true,
-      "required": false
-    },
-    "driver": {
-      "type": "string",
-      "title": "ODBC Driver",
-      "description": "The name of the ODBC driver installed on your system for MS SQL Server.",
-      "default": "ODBC Driver 17 for SQL Server",
-      "required": true
-    },
-    "trust_server_certificate": {
-      "type": "boolean",
-      "title": "Trust Server Certificate",
-      "description": "Set to true to trust the server certificate automatically (e.g., for self-signed certificates).",
-      "default": false,
-      "required": false
+    "servers": {
+      "type": "list",
+      "title": "SQL Server Configurations",
+      "description": "Define one or more SQL Server connections.",
+      "item_title": "SQL Server Connection",
+      "min_items": 1,
+      "items": {
+        "type": "object",
+        "title": "Server Configuration",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Connection Name",
+            "description": "A unique name to identify this server connection (e.g., 'dev-db', 'prod-analytics').",
+            "required": true
+          },
+          "server_address": {
+            "type": "string",
+            "title": "Server Address",
+            "description": "Hostname or IP address of the MS SQL Server instance.",
+            "required": true
+          },
+          "port": {
+            "type": "number",
+            "title": "Port",
+            "description": "Port number for the MS SQL Server instance.",
+            "default": 1433,
+            "required": true
+          },
+          "database_name": {
+            "type": "string",
+            "title": "Default Database Name",
+            "description": "The default database to connect to for this configuration.",
+            "required": true
+          },
+          "authentication_method": {
+            "type": "string",
+            "title": "Authentication Method",
+            "description": "Choose 'sql_server_authentication' or 'windows_authentication'.",
+            "default": "sql_server_authentication",
+            "required": true
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Username for SQL Server Authentication. (Leave blank for Windows Auth)",
+            "required": false
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "description": "Password for SQL Server Authentication. (Leave blank for Windows Auth)",
+            "sensitive": true,
+            "required": false
+          },
+          "driver": {
+            "type": "string",
+            "title": "ODBC Driver",
+            "description": "The name of the ODBC driver installed on your system for MS SQL Server.",
+            "default": "ODBC Driver 17 for SQL Server",
+            "required": true
+          },
+          "trust_server_certificate": {
+            "type": "boolean",
+            "title": "Trust Server Certificate",
+            "description": "Set to true to trust the server certificate automatically (e.g., for self-signed certificates).",
+            "default": false,
+            "required": false
+          }
+        }
+      }
     }
   },
   "tools": [
     {
       "name": "execute_query",
-      "description": "Executes a SQL query against the connected database."
+      "description": "Executes a SQL query against the specified database server.",
+      "parameters": [
+        {
+          "name": "server_name",
+          "type": "string",
+          "description": "The name of the configured server connection to use.",
+          "required": true
+        },
+        {
+          "name": "query",
+          "type": "string",
+          "description": "The SQL query to execute.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "list_databases",
-      "description": "Lists all databases on the SQL server instance."
+      "description": "Lists all databases on the specified SQL server instance.",
+      "parameters": [
+        {
+          "name": "server_name",
+          "type": "string",
+          "description": "The name of the configured server connection to use.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "list_tables",
-      "description": "Lists all tables in the current/specified database."
+      "description": "Lists all tables in the current/specified database on the specified server.",
+      "parameters": [
+        {
+          "name": "server_name",
+          "type": "string",
+          "description": "The name of the configured server connection to use.",
+          "required": true
+        },
+        {
+          "name": "database_name",
+          "type": "string",
+          "description": "Optional: The name of the database to list tables from. If not provided, uses the default database for the connection.",
+          "required": false
+        }
+      ]
     },
     {
       "name": "get_table_schema",
-      "description": "Gets the schema (columns, types) for a specified table."
+      "description": "Gets the schema (columns, types) for a specified table on the specified server.",
+      "parameters": [
+        {
+          "name": "server_name",
+          "type": "string",
+          "description": "The name of the configured server connection to use.",
+          "required": true
+        },
+        {
+          "name": "table_name",
+          "type": "string",
+          "description": "The name of the table (e.g., 'MyTable').",
+          "required": true
+        },
+        {
+          "name": "schema_name",
+          "type": "string",
+          "description": "Optional: The schema of the table (e.g., 'dbo'). Defaults to 'dbo'.",
+          "required": false,
+          "default": "dbo"
+        },
+        {
+          "name": "database_name",
+          "type": "string",
+          "description": "Optional: The name of the database where the table resides. If not provided, uses the default database for the connection.",
+          "required": false
+        }
+      ]
     }
   ],
   "compatibility": {
