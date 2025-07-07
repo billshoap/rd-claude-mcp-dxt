@@ -18,14 +18,14 @@ def load_server_configs():
     configs_json_str = os.environ.get("MSSQL_SERVER_CONFIGS")
     if not configs_json_str:
         # Log this or raise an error so it's visible during startup if configs are missing
-        mcp.log("ERROR: MSSQL_SERVER_CONFIGS environment variable not found or empty.")
+        print("ERROR: MSSQL_SERVER_CONFIGS environment variable not found or empty.", file=sys.stderr)
         SERVER_CONFIGS = {} # Ensure it's an empty dict if loading fails
         return
 
     try:
         configs_list = json.loads(configs_json_str)
         if not isinstance(configs_list, list):
-            mcp.log("ERROR: MSSQL_SERVER_CONFIGS is not a JSON list.")
+            print("ERROR: MSSQL_SERVER_CONFIGS is not a JSON list.", file=sys.stderr)
             SERVER_CONFIGS = {}
             return
 
@@ -39,14 +39,14 @@ def load_server_configs():
                     config["password"] = None
                 SERVER_CONFIGS[config["name"]] = config
             else:
-                mcp.log(f"WARNING: Skipping invalid server configuration item: {config}")
-        mcp.log(f"Loaded {len(SERVER_CONFIGS)} server configurations: {list(SERVER_CONFIGS.keys())}")
+                print(f"WARNING: Skipping invalid server configuration item: {config}", file=sys.stderr)
+        print(f"Loaded {len(SERVER_CONFIGS)} server configurations: {list(SERVER_CONFIGS.keys())}", file=sys.stderr)
 
     except json.JSONDecodeError as e:
-        mcp.log(f"ERROR: Failed to parse MSSQL_SERVER_CONFIGS JSON: {e}")
+        print(f"ERROR: Failed to parse MSSQL_SERVER_CONFIGS JSON: {e}", file=sys.stderr)
         SERVER_CONFIGS = {}
     except Exception as e:
-        mcp.log(f"ERROR: An unexpected error occurred while loading server configurations: {e}")
+        print(f"ERROR: An unexpected error occurred while loading server configurations: {e}", file=sys.stderr)
         SERVER_CONFIGS = {}
 
 
@@ -140,14 +140,14 @@ def execute_query(server_name: str, query: str) -> str:
                     else:
                         return json.dumps({"status": "success", "server_name": server_name, "message": "Query executed successfully. No rows returned and no rowcount available."})
 
-                mcp.log(f"Query on '{server_name}' returned {len(results['rows'])} rows.")
+                print(f"Query on '{server_name}' returned {len(results['rows'])} rows.", file=sys.stderr)
                 return json.dumps(results)
 
     except (pyodbc.Error, ConnectionError, ValueError) as e:
-        mcp.log(f"ERROR in execute_query for '{server_name}': {e}")
+        print(f"ERROR in execute_query for '{server_name}': {e}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "message": str(e)})
     except Exception as e:
-        mcp.log(f"ERROR: An unexpected error occurred in execute_query for '{server_name}': {str(e)}")
+        print(f"ERROR: An unexpected error occurred in execute_query for '{server_name}': {str(e)}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
@@ -160,16 +160,16 @@ def list_databases(server_name: str) -> str:
     try:
         with get_db_connection(server_name) as conn: # Connect to the master/default db of the server config
             with conn.cursor() as cursor:
-                mcp.log(f"Listing databases on '{server_name}'.")
+                print(f"Listing databases on '{server_name}'.", file=sys.stderr)
                 cursor.execute(query)
                 databases = [row[0] for row in cursor.fetchall()]
-                mcp.log(f"Found {len(databases)} databases on '{server_name}'.")
+                print(f"Found {len(databases)} databases on '{server_name}'.", file=sys.stderr)
                 return json.dumps({"databases": databases, "server_name": server_name})
     except (pyodbc.Error, ConnectionError, ValueError) as e:
-        mcp.log(f"ERROR in list_databases for '{server_name}': {e}")
+        print(f"ERROR in list_databases for '{server_name}': {e}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "message": str(e)})
     except Exception as e:
-        mcp.log(f"ERROR: An unexpected error occurred in list_databases for '{server_name}': {str(e)}")
+        print(f"ERROR: An unexpected error occurred in list_databases for '{server_name}': {str(e)}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
@@ -185,17 +185,17 @@ def list_tables(server_name: str, database_name: str = None) -> str:
         with get_db_connection(server_name, database_name_override=database_name) as conn:
             # The connection context (conn) is now to the correct database (either default or override)
             db_used = conn.getinfo(pyodbc.SQL_DATABASE_NAME) # Get actual DB connected to for logging
-            mcp.log(f"Listing tables in database '{db_used}' on server '{server_name}'.")
+            print(f"Listing tables in database '{db_used}' on server '{server_name}'.", file=sys.stderr)
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 tables = [f"{row[0]}.{row[1]}" for row in cursor.fetchall()]
-                mcp.log(f"Found {len(tables)} tables in database '{db_used}' on server '{server_name}'.")
+                print(f"Found {len(tables)} tables in database '{db_used}' on server '{server_name}'.", file=sys.stderr)
                 return json.dumps({"tables": tables, "server_name": server_name, "database_name": db_used})
     except (pyodbc.Error, ConnectionError, ValueError) as e:
-        mcp.log(f"ERROR in list_tables for '{server_name}' (DB: {database_name}): {e}")
+        print(f"ERROR in list_tables for '{server_name}' (DB: {database_name}): {e}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "database_name": database_name, "message": str(e)})
     except Exception as e:
-        mcp.log(f"ERROR: An unexpected error occurred in list_tables for '{server_name}' (DB: {database_name}): {str(e)}")
+        print(f"ERROR: An unexpected error occurred in list_tables for '{server_name}' (DB: {database_name}): {str(e)}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "database_name": database_name, "message": f"An unexpected error occurred: {str(e)}"})
 
 @mcp.tool()
@@ -222,7 +222,7 @@ def get_table_schema(server_name: str, table_name: str, schema_name: str = 'dbo'
         # database_name parameter overrides the default database_name from the server's config for this call
         with get_db_connection(server_name, database_name_override=database_name) as conn:
             db_used = conn.getinfo(pyodbc.SQL_DATABASE_NAME) # Get actual DB connected to for logging
-            mcp.log(f"Getting schema for table '{schema_name}.{table_name}' in database '{db_used}' on server '{server_name}'.")
+            print(f"Getting schema for table '{schema_name}.{table_name}' in database '{db_used}' on server '{server_name}'.", file=sys.stderr)
             with conn.cursor() as cursor:
                 cursor.execute(query, table_name, schema_name)
                 columns = []
@@ -235,29 +235,29 @@ def get_table_schema(server_name: str, table_name: str, schema_name: str = 'dbo'
                             "is_nullable": row[3]
                         })
                 if not columns:
-                     mcp.log(f"WARNING: Table '{schema_name}.{table_name}' not found or has no columns in database '{db_used}' on server '{server_name}'.")
+                     print(f"WARNING: Table '{schema_name}.{table_name}' not found or has no columns in database '{db_used}' on server '{server_name}'.", file=sys.stderr)
                      return json.dumps({"status": "error", "server_name": server_name, "database_name": db_used, "table_name": f"{schema_name}.{table_name}", "message": f"Table '{schema_name}.{table_name}' not found or has no columns in database '{db_used}'."})
-                mcp.log(f"Schema retrieved for '{schema_name}.{table_name}' in database '{db_used}' on server '{server_name}'. Found {len(columns)} columns.")
+                print(f"Schema retrieved for '{schema_name}.{table_name}' in database '{db_used}' on server '{server_name}'. Found {len(columns)} columns.", file=sys.stderr)
                 return json.dumps({"schema": columns, "server_name": server_name, "database_name": db_used, "table_name": f"{schema_name}.{table_name}"})
     except (pyodbc.Error, ConnectionError, ValueError) as e:
-        mcp.log(f"ERROR in get_table_schema for '{server_name}' (DB: {database_name}, Table: {schema_name}.{table_name}): {e}")
+        print(f"ERROR in get_table_schema for '{server_name}' (DB: {database_name}, Table: {schema_name}.{table_name}): {e}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "database_name": database_name, "table_name": f"{schema_name}.{table_name}", "message": str(e)})
     except Exception as e:
-        mcp.log(f"ERROR: An unexpected error occurred in get_table_schema for '{server_name}' (DB: {database_name}, Table: {schema_name}.{table_name}): {str(e)}")
+        print(f"ERROR: An unexpected error occurred in get_table_schema for '{server_name}' (DB: {database_name}, Table: {schema_name}.{table_name}): {str(e)}", file=sys.stderr)
         return json.dumps({"status": "error", "server_name": server_name, "database_name": database_name, "table_name": f"{schema_name}.{table_name}", "message": f"An unexpected error occurred: {str(e)}"})
 
 if __name__ == "__main__":
-    mcp.log("MSSQL DXT Server starting up...")
+    print("MSSQL DXT Server starting up...", file=sys.stderr)
     load_server_configs() # Load configs at startup
 
     if not SERVER_CONFIGS:
-        mcp.log("CRITICAL: No server configurations were loaded. The extension may not function correctly.")
+        print("CRITICAL: No server configurations were loaded. The extension may not function correctly.", file=sys.stderr)
         # Depending on desired behavior, could exit here if running standalone and no configs.
         # For DXT, it might still run but tools will fail until valid configs are provided by the host.
 
     try:
         mcp.run()
     except Exception as e:
-        mcp.log(f"CRITICAL: MCP server encountered an unrecoverable error: {e}")
+        print(f"CRITICAL: MCP server encountered an unrecoverable error: {e}", file=sys.stderr)
         # print(json.dumps({"status": "error", "message": f"Server critical failure: {e}"}), file=sys.stdout) # For direct run debugging
         sys.exit(1)
