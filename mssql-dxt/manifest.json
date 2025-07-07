@@ -23,76 +23,11 @@
   },
   "user_config": {
     "servers": {
-      "type": "list",
-      "title": "SQL Server Configurations",
-      "description": "Define one or more SQL Server connections.",
-      "item_title": "SQL Server Connection",
-      "min_items": 1,
-      "items": {
-        "type": "object",
-        "title": "Server Configuration",
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Connection Name",
-            "description": "A unique name to identify this server connection (e.g., 'dev-db', 'prod-analytics').",
-            "required": true
-          },
-          "server_address": {
-            "type": "string",
-            "title": "Server Address",
-            "description": "Hostname or IP address of the MS SQL Server instance.",
-            "required": true
-          },
-          "port": {
-            "type": "number",
-            "title": "Port",
-            "description": "Port number for the MS SQL Server instance.",
-            "default": 1433,
-            "required": true
-          },
-          "database_name": {
-            "type": "string",
-            "title": "Default Database Name",
-            "description": "The default database to connect to for this configuration.",
-            "required": true
-          },
-          "authentication_method": {
-            "type": "string",
-            "title": "Authentication Method",
-            "description": "Choose 'sql_server_authentication' or 'windows_authentication'.",
-            "default": "sql_server_authentication",
-            "required": true
-          },
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "Username for SQL Server Authentication. (Leave blank for Windows Auth)",
-            "required": false
-          },
-          "password": {
-            "type": "string",
-            "title": "Password",
-            "description": "Password for SQL Server Authentication. (Leave blank for Windows Auth)",
-            "sensitive": true,
-            "required": false
-          },
-          "driver": {
-            "type": "string",
-            "title": "ODBC Driver",
-            "description": "The name of the ODBC driver installed on your system for MS SQL Server.",
-            "default": "ODBC Driver 17 for SQL Server",
-            "required": true
-          },
-          "trust_server_certificate": {
-            "type": "boolean",
-            "title": "Trust Server Certificate",
-            "description": "Set to true to trust the server certificate automatically (e.g., for self-signed certificates).",
-            "default": false,
-            "required": false
-          }
-        }
-      }
+      "type": "string",
+      "title": "SQL Server Configurations (JSON)",
+      "description": "Enter a JSON string representing an array of server configurations. Each configuration object in the array must have a unique 'name' property. Example: [{\"name\": \"dev-db\", \"server_address\": \"localhost\", \"port\": 1433, \"database_name\": \"mydb\", \"authentication_method\": \"sql_server_authentication\", \"username\": \"sa\", \"password\": \"yourPassword!\", \"driver\": \"ODBC Driver 17 for SQL Server\", \"trust_server_certificate\": false}, {\"name\": \"prod-db\", ...}]",
+      "required": true,
+      "default": "[{\"name\": \"example-db\", \"server_address\": \"your_server_address\", \"port\": 1433, \"database_name\": \"your_default_database\", \"authentication_method\": \"sql_server_authentication\", \"username\": \"your_username\", \"password\": \"your_password\", \"driver\": \"ODBC Driver 17 for SQL Server\", \"trust_server_certificate\": false}]"
     }
   },
   "tools": [
