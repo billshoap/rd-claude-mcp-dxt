@@ -17,30 +17,57 @@ def get_user_config_data():
     config_str = os.environ.get(USER_CONFIG_ENV_VAR)
     if not config_str:
         print("Warning: USER_CONFIG environment variable not found. No user configuration loaded.", file=sys.stderr)
-        return {} # Return empty dict, which means 'connections_json' will be missing
+        return {"connections": []}
     try:
-        raw_user_config = json.loads(config_str)
-        connections_list = []
-        connections_json_str = raw_user_config.get("connections_json")
+        user_config = json.loads(config_str)
+        active_connections = []
+        for i in range(1, 4): # For conn1, conn2, conn3
+            conn_prefix = f"conn{i}_"
 
-        if connections_json_str:
-            try:
-                parsed_connections = json.loads(connections_json_str)
-                if isinstance(parsed_connections, list):
-                    connections_list = parsed_connections
-                else:
-                    print(f"Error: 'connections_json' in USER_CONFIG is not a JSON array. Found type: {type(parsed_connections)}", file=sys.stderr)
-            except json.JSONDecodeError as e:
-                print(f"Error decoding 'connections_json' string: {e}. Content: '{connections_json_str[:100]}...'", file=sys.stderr)
-        else:
-            print("Info: 'connections_json' not found or empty in USER_CONFIG. No connections will be configured.", file=sys.stderr)
+            # Check if the connection is enabled or if essential fields are present
+            # Default conn1_enable to True if not explicitly set, others to False
+            is_enabled_key = f"{conn_prefix}enable"
+            if i == 1 and is_enabled_key not in user_config : # conn1_enable defaults to true
+                 is_enabled = True
+            else:
+                 is_enabled = user_config.get(is_enabled_key, False)
 
-        # Store the parsed list under a 'connections' key for compatibility with rest of the script
-        return {"connections": connections_list}
+            if is_enabled:
+                name = user_config.get(f"{conn_prefix}name")
+                server = user_config.get(f"{conn_prefix}server")
+                database = user_config.get(f"{conn_prefix}database")
+
+                if not all([name, server, database]):
+                    print(f"Warning: Connection {i} is enabled but missing one or more required fields (name, server, database). Skipping.", file=sys.stderr)
+                    continue
+
+                connection_details = {
+                    "name": name,
+                    "server": server,
+                    "port": user_config.get(f"{conn_prefix}port", 1433),
+                    "database": database,
+                    "auth_method": user_config.get(f"{conn_prefix}auth_method", "sql_server_authentication"),
+                    "username": user_config.get(f"{conn_prefix}username"),
+                    "password": user_config.get(f"{conn_prefix}password"),
+                    "driver": user_config.get(f"{conn_prefix}driver", "ODBC Driver 17 for SQL Server"),
+                    "trust_cert": user_config.get(f"{conn_prefix}trust_cert", False)
+                }
+
+                # Validate username for SQL auth
+                if connection_details["auth_method"] == "sql_server_authentication" and not connection_details["username"]:
+                    print(f"Warning: Connection '{name}' (Slot {i}) uses SQL Server Authentication but username is not provided. This might lead to connection issues.", file=sys.stderr)
+                    # We'll still add it, but the connection attempt will likely fail or prompt if interactive (not here)
+
+                active_connections.append(connection_details)
+
+        if not active_connections:
+            print("Info: No active connections configured or enabled.", file=sys.stderr)
+
+        return {"connections": active_connections}
 
     except json.JSONDecodeError as e:
-        print(f"Error decoding the main USER_CONFIG JSON: {e}", file=sys.stderr)
-        return {} # Return empty dict
+        print(f"Error decoding USER_CONFIG JSON: {e}", file=sys.stderr)
+        return {"connections": []}
 
 USER_CONFIG_DATA = None
 
