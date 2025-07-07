@@ -15,7 +15,7 @@ USER_CONFIG_ENV_VAR = "USER_CONFIG"
 def get_user_config_data():
     """Retrieves user configuration data."""
     config_str = os.environ.get(USER_CONFIG_ENV_VAR)
-    print(f"DEBUG: Received USER_CONFIG string: '{config_str}'", file=sys.stderr) # Added for diagnostics
+    # print(f"DEBUG: Received USER_CONFIG string: '{config_str}'", file=sys.stderr) # Removed for now
     if not config_str or not config_str.strip(): # Check for None, empty, or whitespace-only
         print("Warning: USER_CONFIG environment variable not found or is effectively empty. No user configuration loaded.", file=sys.stderr)
         return {"connections": []}
@@ -347,6 +347,7 @@ def perform_startup_connection_tests():
 
 
 if __name__ == "__main__":
+    print("DEBUG: Python script main block started.", file=sys.stderr) # New diagnostic line
     # Load config first
     USER_CONFIG_DATA = get_user_config_data()
 
