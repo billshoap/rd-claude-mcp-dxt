@@ -287,5 +287,80 @@
       "linux"
     ]
   },
-  "license": "MIT"
+  "license": "MIT",
+  "pii_masking": {
+    "enable": true,
+    "default_strategy": "REDACT_ALL",
+    "rules": [
+      {
+        "rule_name": "MaskEmailsInUserTable",
+        "enabled": true,
+        "type": "predefined",
+        "pattern_name": "EMAIL",
+        "apply_to_columns": ["email", "user_email", "EmailAddress"],
+        "strategy": "REDACT_PARTIAL_EMAIL"
+      },
+      {
+        "rule_name": "MaskPhonesGlobally",
+        "enabled": true,
+        "type": "predefined",
+        "pattern_name": "PHONE",
+        "apply_to_columns": ["*"],
+        "strategy": "REDACT_PARTIAL_GENERIC",
+        "strategy_params": {
+          "visible_chars_start": 0,
+          "visible_chars_end": 4
+        }
+      },
+      {
+        "rule_name": "MaskSSNWhenColumnIsSSN",
+        "enabled": true,
+        "type": "predefined",
+        "pattern_name": "SSN",
+        "apply_to_columns": ["ssn", "SocialSecurityNumber", "tax_id"],
+        "strategy": "REDACT_ALL"
+      },
+      {
+        "rule_name": "FinancialAccountNumbers",
+        "enabled": true,
+        "type": "custom_regex",
+        "pattern": "\\b\\d{4}[ -]?\\d{4}[ -]?\\d{4}[ -]?\\d{4}\\b",
+        "description": "Matches typical 16-digit account numbers, potentially with spaces/hyphens.",
+        "apply_to_columns": ["account_number", "financial_acc_id"],
+        "strategy": "REDACT_PARTIAL_GENERIC",
+        "strategy_params": {
+          "visible_chars_start": 0,
+          "visible_chars_end": 4,
+          "min_len_to_mask": 10
+        }
+      },
+      {
+        "rule_name": "UserIdColumnHashing",
+        "enabled": true,
+        "type": "column_name_exact",
+        "column_names": ["user_id", "customer_id", "UserID"],
+        "apply_to_columns": ["user_id", "customer_id", "UserID"],
+        "strategy": "HASH_SHA256",
+        "strategy_params": {"salt": "mssql-dxt-unique-salt-value"}
+      },
+      {
+        "rule_name": "PasswordOrTokenColumns",
+        "enabled": true,
+        "type": "column_name_pattern",
+        "column_name_patterns": ["*password", "*_token", "secret_*", "access_key"],
+        "apply_to_columns": ["*"],
+        "strategy": "REDACT_ALL"
+      }
+    ],
+    "predefined_patterns": {
+      "EMAIL": "(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\x09\\x0b\\x0c\\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\x7f]|\\\\[\\x01-\x09\\x0b\\x0c\\x0e-\x7f])+)\\])",
+      "PHONE": "\\b(?:\\+?1[ -\\.]?)?(?:\\(\\d{3}\\)|\\d{3})[ -\\.]?\\d{3}[ -\\.]?\\d{4}\\b",
+      "SSN": "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    },
+    "environment_variable_overrides": {
+      "prefix": "MCP_MSSQL_PII_",
+      "enable": "ENABLE_MASKING",
+      "default_strategy": "DEFAULT_STRATEGY"
+    }
+  }
 }

@@ -5,9 +5,71 @@ import sys
 import json
 import pyodbc
 from mcp.server.fastmcp import FastMCP
+from pathlib import Path # For robust path handling
+
+# Attempt to import PiiMasker
+try:
+    from lib.mcp_pii_utils.masker import PiiMasker
+    PII_MASKER_ENABLED_LIB = True
+except ImportError:
+    PiiMasker = None
+    PII_MASKER_ENABLED_LIB = False
+    print("Warning: mcp_pii_utils.masker not found. PII Masking will be disabled.", file=sys.stderr)
 
 # Initialize MCP Server
 mcp = FastMCP("mssql-dxt-server")
+
+# Global PII Masker instance
+PII_MASKER_INSTANCE = None
+
+def load_pii_config_and_initialize_masker():
+    """Loads PII configuration from manifest.json and initializes the PiiMasker."""
+    global PII_MASKER_INSTANCE
+    if not PII_MASKER_ENABLED_LIB or PiiMasker is None:
+        PII_MASKER_INSTANCE = None # Ensure it's None if library failed to load
+        print("PII Masking library not available, PII masking is disabled.", file=sys.stderr)
+        return
+
+    try:
+        # manifest.json is expected to be in the root of the DXT package,
+        # which is two levels up from this server/main.py file.
+        # __file__ is mssql-dxt/server/main.py
+        # manifest_path is mssql-dxt/manifest.json
+        server_script_path = Path(__file__).resolve() # mssql-dxt/server/main.py
+        dxt_root_path = server_script_path.parent.parent # mssql-dxt/
+        manifest_path = dxt_root_path / 'manifest.json'
+
+        if not manifest_path.exists():
+            print(f"Warning: manifest.json not found at expected path: {manifest_path}. PII Masking will be disabled.", file=sys.stderr)
+            PII_MASKER_INSTANCE = PiiMasker({"enable": False, "comment": "Manifest not found"})
+            return
+
+        with open(manifest_path, 'r') as f:
+            manifest_data = json.load(f)
+
+        pii_config = manifest_data.get("pii_masking")
+        if pii_config is None:
+            print("Info: 'pii_masking' section not found in manifest.json. PII Masking will be disabled by default.", file=sys.stderr)
+            PII_MASKER_INSTANCE = PiiMasker({"enable": False, "comment": "pii_masking section missing"})
+        elif not isinstance(pii_config, dict):
+            print("Warning: 'pii_masking' section in manifest.json is not a valid dictionary. PII Masking will be disabled.", file=sys.stderr)
+            PII_MASKER_INSTANCE = PiiMasker({"enable": False, "comment": "pii_masking section invalid type"})
+        else:
+            # Potentially override with environment variables here if needed
+            # For example: pii_config["enable"] = os.environ.get("MCP_PII_ENABLE_MASKING", pii_config["enable"])
+            PII_MASKER_INSTANCE = PiiMasker(pii_config)
+            if PII_MASKER_INSTANCE.enabled:
+                print("PII Masker initialized and enabled from manifest configuration.", file=sys.stderr)
+            else:
+                print("PII Masker initialized; masking is disabled by manifest configuration.", file=sys.stderr)
+
+    except Exception as e:
+        print(f"Error loading PII config from manifest: {e}. PII Masking will be disabled.", file=sys.stderr)
+        # Ensure PII_MASKER_INSTANCE is a disabled PiiMasker on error
+        PII_MASKER_INSTANCE = PiiMasker({"enable": False, "comment": f"Error during init: {e}"})
+
+# Call this at the start of the DXT, before mcp.run()
+# load_pii_config_and_initialize_masker() is called in the main block later
 
 # This environment variable can be used by the DXT to get its config.
 USER_CONFIG_ENV_VAR = "USER_CONFIG"
@@ -204,17 +266,30 @@ def execute_query(connection_name: str, query: str) -> str:
                 try:
                     fetched_rows_from_cursor = cursor.fetchall()
                     if fetched_rows_from_cursor:
+                         # Convert pyodbc.Row objects to simple lists
                          fetched_rows_list = [list(row_item) for row_item in fetched_rows_from_cursor]
                          results["rows"] = fetched_rows_list
                 except pyodbc.ProgrammingError:
-                    pass # Query did not return rows
+                    pass # Query did not return rows (e.g. INSERT, UPDATE, DELETE without OUTPUT)
 
-                if not results["columns"] and not results["rows"]:
+                # Apply PII Masking if enabled and configured
+                if PII_MASKER_INSTANCE and PII_MASKER_INSTANCE.enabled and results["rows"] and results["columns"]:
+                    try:
+                        # Ensure rows are lists of basic types, not pyodbc.Row objects
+                        # The conversion to list(row_item) above should handle this.
+                        results["rows"] = PII_MASKER_INSTANCE.mask_data(results["rows"], results["columns"])
+                    except Exception as pii_ex:
+                        print(f"Error during PII masking: {pii_ex}", file=sys.stderr)
+                        # Decide if to return original data or error. For now, log and return potentially unmasked/partially masked.
+                        # Could also return an error: return json.dumps({"status": "error", "message": f"PII Masking failed: {pii_ex}"})
+
+                if not results["columns"] and not results["rows"]: # No data returned
                     if cursor.rowcount != -1:
                         return json.dumps({"status": "success", "connection_name": connection_name, "message": f"Query executed successfully. Rows affected: {cursor.rowcount}"})
-                    else:
+                    else: # e.g. a SET statement or something that doesn't provide rowcount
                         return json.dumps({"status": "success", "connection_name": connection_name, "message": "Query executed successfully. No rows returned and no rowcount available."})
 
+                # Return potentially masked results
                 return json.dumps({"connection_name": connection_name, **results})
 
     except (pyodbc.Error, ConnectionError, ValueError) as e:
@@ -380,7 +455,12 @@ def perform_startup_connection_tests():
 
 if __name__ == "__main__":
     print("DEBUG: Python script main block started.", file=sys.stderr)
-    # Load config first by reading individual environment variables
+
+    # Load PII configuration and initialize masker
+    # This should be done early, before any tools that might return data are called.
+    load_pii_config_and_initialize_masker()
+
+    # Load connection config by reading individual environment variables
     USER_CONFIG_DATA = load_connections_from_env()
 
     # Perform startup connection tests (logging to stderr)
