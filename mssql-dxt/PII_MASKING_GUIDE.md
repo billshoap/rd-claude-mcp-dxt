@@ -58,9 +58,9 @@ Each rule in the `rules` array is an object that specifies:
     -   `column_name_pattern`: Masks the entire content of a column if its name matches a glob pattern.
 -   `pattern_name` (string, required for `predefined` type): The name of the pattern to use (e.g., "EMAIL", "PHONE", "SSN"). See `predefined_patterns` below or the library's defaults.
 -   `pattern` (string, required for `custom_regex` type): The regex string. Example: `"^XYZ-[0-9]{4}$"`.
--   `column_names` (array of strings, required for `column_name_exact` type): List of exact column names to match. Example: `["user_id", "customer_id"]`.
--   `column_name_patterns` (array of strings, required for `column_name_pattern` type): List of glob-style column name patterns. Example: `["*_secret", "api_key_*"]`.
--   `apply_to_columns` (array of strings, optional): List of column names or glob patterns where this rule should be applied. If omitted or `["*"]`, the rule applies to all columns. This helps scope detection. Example: `["email", "contact_address"]`.
+-   `column_names` (array of strings, required for `column_name_exact` type): List of exact column names to match. Example: `["user_id", "customer_id"]`. **Matching is case-insensitive.** (It's recommended to define these in lowercase in the manifest.)
+-   `column_name_patterns` (array of strings, required for `column_name_pattern` type): List of glob-style column name patterns. Example: `["*_secret", "api_key_*"]`. **Matching is case-insensitive.** (It's recommended to define these in lowercase in the manifest.)
+-   `apply_to_columns` (array of strings, optional): List of column names or glob patterns where this rule should be applied. If omitted or `["*"]`, the rule applies to all columns. This helps scope detection. Example: `["email", "contact_address"]`. **Matching is case-insensitive.** (It's recommended to define these in lowercase in the manifest.)
 -   `strategy` (string, optional): Overrides the `default_strategy` for this specific rule.
 -   `strategy_params` (object, optional): Parameters for the chosen strategy.
     -   For `REDACT_PARTIAL_GENERIC`: `{"visible_chars_start": 2, "visible_chars_end": 2, "min_len_to_mask": 5}`
