@@ -118,7 +118,6 @@
       "default": false,
       "required": false
     },
-
     "conn2_enable": {
       "type": "boolean",
       "title": "Enable Connection 2",
@@ -186,7 +185,6 @@
       "default": false,
       "required": false
     },
-
     "conn3_enable": {
       "type": "boolean",
       "title": "Enable Connection 3",
@@ -293,11 +291,18 @@
     "default_strategy": "REDACT_ALL",
     "rules": [
       {
-        "rule_name": "MaskEmailsInUserTable",
+        "rule_name": "MaskEmailsByColumnPattern",
         "enabled": true,
         "type": "predefined",
         "pattern_name": "EMAIL",
-        "apply_to_columns": ["email", "user_email", "EmailAddress"],
+        "apply_to_columns": [
+          "*email*",
+          "*mail*",
+          "*emailaddr*",
+          "*mailaddr*",
+          "*email_addr*",
+          "*mail_addr*"
+        ],
         "strategy": "REDACT_PARTIAL_EMAIL"
       },
       {
@@ -317,7 +322,7 @@
         "enabled": true,
         "type": "predefined",
         "pattern_name": "SSN",
-        "apply_to_columns": ["ssn", "SocialSecurityNumber", "tax_id"],
+        "apply_to_columns": ["ssn", "socialsecuritynumber", "tax_id"],
         "strategy": "REDACT_ALL"
       },
       {
@@ -338,8 +343,8 @@
         "rule_name": "UserIdColumnHashing",
         "enabled": true,
         "type": "column_name_exact",
-        "column_names": ["user_id", "customer_id", "UserID"],
-        "apply_to_columns": ["user_id", "customer_id", "UserID"],
+        "column_names": ["user_id", "customer_id", "userid"],
+        "apply_to_columns": ["user_id", "customer_id", "userid"],
         "strategy": "HASH_SHA256",
         "strategy_params": {"salt": "mssql-dxt-unique-salt-value"}
       },
